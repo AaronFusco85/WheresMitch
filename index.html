@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where in the World is Mitch?</title>
+<meta name="description" content="A crowd-sourced hunt for Mitch. Spot him in the wild and pin him to the map.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1b2a4a;
+    --ink: #14213d;
+    --cream: #fbf3df;
+    --paper: #f3e6c4;
+    --line: #dccb9d;
+    --sky: #cfe8ff;
+    --tomato: #e4572e;
+    --mustard: #f6b93b;
+    --blue: #2f5fb3;
+    --muted: #6f6454;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--cream); color: var(--ink);
+    display: flex; flex-direction: column;
+  }
+  .rule { height: 9px; flex-shrink: 0; background: var(--navy); border-bottom: 3px solid var(--mustard); }
+
+  /* ── header ── */
+  header {
+    flex-shrink: 0; display: flex; align-items: center; gap: 14px;
+    padding: 8px 16px; background: var(--cream); border-bottom: 3px solid var(--ink);
+  }
+  .avatar { width: 58px; height: 58px; flex-shrink: 0; border-radius: 50%; border: 3px solid var(--ink); background: var(--sky); overflow: hidden; transition: transform .25s; }
+  .avatar:hover { transform: rotate(-8deg) scale(1.08); }
+  .avatar svg { width: 100%; height: 100%; display: block; }
+  .title h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(26px, 5vw, 46px); letter-spacing: .04em; line-height: .95; }
+  .title h1 em { font-style: normal; color: var(--tomato); display: inline-block; transform: rotate(-3deg); }
+  .title p { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .lastseen { margin-left: auto; text-align: right; flex-shrink: 0; font-family: 'DM Mono', monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .lastseen strong { display: block; margin-top: 2px; font: 700 14px 'DM Sans', sans-serif; letter-spacing: 0; text-transform: none; color: var(--ink); max-width: 230px; }
+
+  main { flex: 1; min-height: 0; display: flex; position: relative; }
+  #mapwrap { flex: 1; min-width: 0; position: relative; background: #dfe9d9; }
+  #map { position: absolute; inset: 0; }
+  #map.spotting { cursor: crosshair; }
+  .map-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 24px; text-align: center; background: var(--paper); z-index: 5; }
+  .map-msg.show { display: flex; }
+  .map-msg div { max-width: 420px; }
+  .map-msg h2 { font: 28px 'Bebas Neue'; letter-spacing: .05em; margin-bottom: 8px; }
+  .map-msg p { line-height: 1.5; font-size: 14px; }
+  .map-msg code { background: #fffaf0; padding: 1px 5px; border-radius: 3px; font-family: 'DM Mono', monospace; font-size: 12px; }
+
+  /* ── sidebar ── */
+  aside { width: 360px; flex-shrink: 0; border-left: 3px solid var(--ink); background: var(--cream); display: flex; flex-direction: column; min-height: 0; }
+
+  .wanted { display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: var(--paper); border-bottom: 3px solid var(--ink); }
+  .wanted .pic { width: 84px; height: 96px; flex-shrink: 0; background: var(--sky); border: 3px solid var(--ink); border-radius: 6px; transform: rotate(-3deg); box-shadow: 3px 3px 0 var(--ink); overflow: hidden; }
+  .wanted .pic svg { width: 100%; height: 100%; display: block; }
+  .wanted h2 { font: 24px/1 'Bebas Neue'; letter-spacing: .05em; color: var(--tomato); }
+  .wanted ul { list-style: none; margin-top: 5px; font-size: 12px; line-height: 1.45; color: #3b342b; }
+  .wanted li::before { content: "★ "; color: var(--mustard); }
+  #stat { font: 500 11px 'DM Mono', monospace; letter-spacing: .06em; margin-top: 6px; color: var(--blue); }
+
+  .tabs { display: flex; border-bottom: 3px solid var(--ink); }
+  .tab { flex: 1; padding: 12px 8px; font: 700 14px 'DM Sans'; cursor: pointer; border: 0; background: var(--cream); color: var(--ink); border-right: 3px solid var(--ink); transition: background .15s; }
+  .tab:last-child { border-right: 0; }
+  .tab:hover { background: var(--paper); }
+  .tab[aria-selected="true"] { background: var(--ink); color: var(--cream); }
+  .tab.spot[aria-selected="true"] { background: var(--tomato); color: #fff; }
+
+  .view { display: none; flex: 1; min-height: 0; overflow-y: auto; }
+  .view.show { display: block; }
+
+  /* find */
+  .item { padding: 11px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:hover, .item:focus-visible { background: var(--paper); outline: none; }
+  .item .t { font-weight: 700; font-size: 14px; }
+  .item .w { font: 11px 'DM Mono', monospace; color: var(--blue); margin: 2px 0; }
+  .item .n { font-size: 13px; color: #3b342b; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .item .b { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .item.latest .t::before { content: "NEWEST · "; color: var(--tomato); font: 10px 'DM Mono'; letter-spacing: .1em; }
+
+  /* spot */
+  .spotpad { padding: 14px 16px 24px; }
+  .spotpad h3 { font: 26px 'Bebas Neue'; letter-spacing: .05em; margin-bottom: 4px; }
+  .steps { list-style: none; counter-reset: s; margin: 8px 0 12px; }
+  .steps li { counter-increment: s; position: relative; padding-left: 30px; font-size: 13px; line-height: 1.45; margin-bottom: 7px; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: -1px; width: 21px; height: 21px; border-radius: 50%; background: var(--mustard); border: 2px solid var(--ink); font: 700 11px/17px 'DM Sans'; text-align: center; }
+  .searchrow { display: flex; gap: 6px; }
+  .searchrow input { flex: 1; }
+  form { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 2px dashed var(--line); }
+  form[hidden] { display: none; }
+  label { font: 10.5px 'DM Mono', monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  input, textarea { width: 100%; margin-top: 3px; padding: 9px 10px; font: 14px 'DM Sans'; color: var(--ink); background: #fffaf0; border: 2px solid var(--ink); border-radius: 4px; }
+  textarea { resize: vertical; min-height: 78px; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid rgba(228,87,46,.45); outline-offset: 1px; }
+  .coords { font: 11px 'DM Mono'; color: var(--blue); }
+  button.btn { font: 700 14px 'DM Sans'; padding: 10px 14px; cursor: pointer; border: 2px solid var(--ink); border-radius: 4px; background: var(--tomato); color: #fff; box-shadow: 3px 3px 0 var(--ink); transition: transform .1s, box-shadow .1s; }
+  button.btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
+  button.btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  button.btn.ghost { background: #fffaf0; color: var(--ink); }
+  button.btn:disabled { opacity: .6; cursor: wait; }
+  .row { display: flex; gap: 8px; }
+  .msg { font-size: 13px; min-height: 1.2em; }
+  .msg.err { color: #b3261e; font-weight: 500; }
+  .banner { margin: 10px 16px 0; padding: 8px 10px; background: #fff3cd; border: 2px solid var(--ink); border-radius: 4px; font-size: 12px; line-height: 1.4; }
+  .banner[hidden] { display: none; }
+
+  /* markers */
+  .pin { position: relative; width: 46px; height: 56px; cursor: pointer; filter: drop-shadow(0 3px 2px rgba(0,0,0,.35)); }
+  .pin .face { width: 46px; height: 46px; border-radius: 50%; border: 3px solid var(--ink); background: var(--sky); overflow: hidden; }
+  .pin .face svg { width: 100%; height: 100%; display: block; }
+  .pin::after { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); border: 9px solid transparent; border-top: 11px solid var(--ink); border-bottom: 0; }
+  .pin.latest { animation: hop 1.2s ease-in-out infinite; transform-origin: 50% 100%; }
+  .pin.latest .face { border-color: var(--tomato); background: #ffe3b0; }
+  .pin.latest::after { border-top-color: var(--tomato); }
+  .pin.latest::before { content: "FOUND HIM!"; position: absolute; left: 50%; top: -17px; transform: translateX(-50%) rotate(-4deg); white-space: nowrap; background: var(--mustard); color: var(--ink); border: 2px solid var(--ink); border-radius: 4px; padding: 0 5px; font: 11px/15px 'Bebas Neue'; letter-spacing: .08em; }
+  @keyframes hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .draftpin { width: 34px; height: 44px; filter: drop-shadow(0 3px 2px rgba(0,0,0,.4)); animation: drop .35s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes drop { from { transform: translateY(-40px); opacity: 0; } }
+
+  /* info window */
+  .gm-style .gm-style-iw-c { border-radius: 6px !important; border: 3px solid var(--ink); background: var(--cream) !important; padding: 0 !important; }
+  .iw { padding: 12px 14px; max-width: 250px; }
+  .iw .t { font: 700 15px 'DM Sans'; }
+  .iw .w { font: 11px 'DM Mono'; color: var(--blue); margin: 3px 0 7px; }
+  .iw .n { font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .iw .b { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* celebration */
+  .confetti { position: fixed; top: -30px; z-index: 50; font-size: 26px; pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 30px); opacity: 0; z-index: 60; background: var(--ink); color: var(--cream); padding: 12px 18px; border-radius: 999px; font-weight: 700; border: 3px solid var(--mustard); transition: .3s; pointer-events: none; text-align: center; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 800px) {
+    header { padding: 8px 12px; gap: 10px; }
+    .avatar { width: 44px; height: 44px; }
+    .title p, .lastseen span { display: none; }
+    .lastseen strong { max-width: 120px; font-size: 12px; }
+    main { flex-direction: column; }
+    #mapwrap { flex: 1 1 42%; }
+    aside { width: 100%; flex: 1 1 58%; border-left: 0; border-top: 3px solid var(--ink); }
+    .wanted .pic { width: 60px; height: 68px; }
+    .wanted ul li:nth-child(3) { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pin.latest, .draftpin { animation: none; } .confetti { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- Cartoon Mitch: chef toque, big grin, chef whites with blue piping -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mitch-bust" viewBox="0 0 100 120">
+    <path d="M42 76 h16 v14 h-16z" fill="#f2c9a0" stroke="#14213d" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M6 120 C8 96 26 88 40 86 L60 86 C74 88 92 96 94 120 Z" fill="#fff" stroke="#14213d" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M38 86 L50 109 L62 86" fill="none" stroke="#2f5fb3" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+    <g fill="#e8eef8" stroke="#14213d" stroke-width="1.5"><circle cx="40" cy="106" r="2.4"/><circle cx="60" cy="106" r="2.4"/><circle cx="41" cy="115" r="2.4"/><circle cx="59" cy="115" r="2.4"/></g>
+    <circle cx="26" cy="58" r="5.5" fill="#f2c9a0" stroke="#14213d" stroke-width="3"/>
+    <circle cx="74" cy="58" r="5.5" fill="#f2c9a0" stroke="#14213d" stroke-width="3"/>
+    <ellipse cx="50" cy="56" rx="24" ry="27" fill="#f2c9a0" stroke="#14213d" stroke-width="3"/>
+    <path d="M30 78 Q50 96 70 78 Q68 84 50 86 Q32 84 30 78Z" fill="#b78a66" opacity=".0"/>
+    <path d="M28 62 Q50 94 72 62 Q70 80 50 83 Q30 80 28 62Z" fill="#b78a66" opacity=".35"/>
+    <path d="M29 40 Q50 35 71 40 L72 47 Q50 42 28 47Z" fill="#2a1d17"/>
+    <path d="M27 44 L30 44 L30 58 L27 53Z M73 44 L70 44 L70 58 L73 53Z" fill="#2a1d17"/>
+    <path d="M30 29 C13 27 13 9 30 10 C32 1 48 0 54 6 C63 0 79 5 76 17 C87 21 81 29 70 29 Z" fill="#fff" stroke="#14213d" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M30 28 h40 v13 h-40z" fill="#fff" stroke="#14213d" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M36 50 q5 -4 10 0 M54 50 q5 -4 10 0" fill="none" stroke="#2a1d17" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="41" cy="57" r="2.8" fill="#14213d"/><circle cx="59" cy="57" r="2.8" fill="#14213d"/>
+    <circle cx="34" cy="67" r="4.5" fill="#e9967a" opacity=".5"/><circle cx="66" cy="67" r="4.5" fill="#e9967a" opacity=".5"/>
+    <path d="M50 58 q-3.5 7 0 9 q3 -1 3.5 -2" fill="none" stroke="#b9825a" stroke-width="2" stroke-linecap="round"/>
+    <path d="M34 69 Q50 88 66 69 Q50 74 34 69Z" fill="#fff" stroke="#14213d" stroke-width="2.6" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<div class="rule"></div>
+<header>
+  <div class="avatar"><svg viewBox="8 0 84 84" aria-hidden="true"><use href="#mitch-bust" width="100" height="120"/></svg></div>
+  <div class="title">
+    <h1>Where in the World is <em>Mitch?</em></h1>
+    <p>Spot him in the wild. Pin him to the map.</p>
+  </div>
+  <div class="lastseen"><span>Last seen</span><strong id="lastSeen">Searching…</strong></div>
+</header>
+
+<main>
+  <div id="mapwrap">
+    <div id="map" role="application" aria-label="Map of Mitch sightings"></div>
+    <div class="map-msg" id="mapMsg"><div></div></div>
+  </div>
+
+  <aside>
+    <div class="wanted">
+      <div class="pic"><svg viewBox="0 0 100 120" aria-hidden="true" preserveAspectRatio="xMidYMax slice"><use href="#mitch-bust" width="100" height="120"/></svg></div>
+      <div>
+        <h2>Have you seen this chef?</h2>
+        <ul>
+          <li>Wears chef whites, trimmed in blue</li>
+          <li>Enormous grin, extremely friendly</li>
+          <li>Often found near very good food</li>
+        </ul>
+        <div id="stat"></div>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabFind" role="tab" aria-selected="true" aria-controls="viewFind">🔍 Find Mitch</button>
+      <button class="tab spot" id="tabSpot" role="tab" aria-selected="false" aria-controls="viewSpot">📍 I spotted Mitch!</button>
+    </div>
+    <div class="banner" id="demoBanner" hidden></div>
+
+    <div class="view show" id="viewFind" role="tabpanel" aria-labelledby="tabFind"><div id="list"></div></div>
+
+    <div class="view" id="viewSpot" role="tabpanel" aria-labelledby="tabSpot">
+      <div class="spotpad">
+        <h3>Caught him? Tell us!</h3>
+        <ol class="steps">
+          <li>Zoom in on the map, or search for the place.</li>
+          <li>Tap the exact spot. You can drag the pin to nudge it.</li>
+          <li>Give your sighting a title, a time and the story.</li>
+        </ol>
+        <div class="searchrow">
+          <input id="search" placeholder="Search a place or address" aria-label="Search a place or address">
+          <button class="btn ghost" id="searchBtn" type="button">Go</button>
+          <button class="btn ghost" id="locBtn" type="button" title="Use my location" aria-label="Use my location">◎</button>
+        </div>
+        <div class="msg" id="searchMsg" role="status"></div>
+
+        <form id="form" hidden autocomplete="off">
+          <div class="coords" id="coords"></div>
+          <div><label for="title">Title</label><input id="title" maxlength="80" required placeholder="e.g. Mitch at Brasserie Boulud"></div>
+          <div><label for="when">Date &amp; time spotted</label><input id="when" type="datetime-local" required></div>
+          <div><label for="note">Description</label><textarea id="note" maxlength="500" placeholder="What was he doing? Who was he with? Did he see you?"></textarea></div>
+          <div><label for="reporter">Your name (optional)</label><input id="reporter" maxlength="40" placeholder="Secret agent name welcome"></div>
+          <div class="msg" id="msg" role="status"></div>
+          <div class="row">
+            <button class="btn" type="submit" id="submit">Pin that chef!</button>
+            <button class="btn ghost" type="button" id="cancel">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </aside>
+</main>
+<div class="rule"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const cfg = window.MITCH_CONFIG || {};
+  const isSet = v => v && !/^YOUR_/.test(v);
+  const hasMaps = isSet(cfg.googleMapsApiKey);
+  const hasFirebase = cfg.firebase && isSet(cfg.firebase.apiKey) && isSet(cfg.firebase.projectId);
+
+  /* ───────── helpers ───────── */
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const fmt = ms => new Date(ms).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  function ago(ms) {
+    const s = Math.max(0, (Date.now() - ms) / 1000);
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' hr ago';
+    const d = Math.round(s / 86400);
+    return d === 1 ? 'yesterday' : d + ' days ago';
+  }
+  const localNow = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+  const ll = p => (typeof p.lat === 'function' ? { lat: p.lat(), lng: p.lng() } : { lat: p.lat, lng: p.lng });
+  function toast(text) {
+    const t = $('toast'); t.textContent = text; t.classList.add('show');
+    clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3200);
+  }
+  function confetti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const bits = ['🍴', '🥖', '🍷', '⭐', '🎉', '🧀', '🥂'];
+    for (let i = 0; i < 34; i++) {
+      const c = el('div', 'confetti', bits[i % bits.length]);
+      c.style.left = Math.random() * 100 + 'vw';
+      c.style.animationDuration = 1.6 + Math.random() * 1.6 + 's';
+      c.style.animationDelay = Math.random() * 0.5 + 's';
+      document.body.append(c); setTimeout(() => c.remove(), 4200);
+    }
+  }
+
+  /* ───────── storage: Firebase (shared) or a local demo fallback ───────── */
+  async function firebaseStore() {
+    const v = '10.12.2';
+    const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`);
+    const fs = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore.js`);
+    const db = fs.getFirestore(initializeApp(cfg.firebase));
+    const col = fs.collection(db, 'sightings');
+    return {
+      shared: true,
+      subscribe(cb, onError) {
+        return fs.onSnapshot(fs.query(col, fs.orderBy('spottedAt', 'desc'), fs.limit(500)), snap => {
+          cb(snap.docs.map(d => {
+            const x = d.data();
+            return { id: d.id, lat: x.lat, lng: x.lng, title: x.title, note: x.note, reporter: x.reporter,
+                     spotted_at: x.spottedAt ? x.spottedAt.toMillis() : Date.now() };
+          }));
+        }, onError);
+      },
+      add(p) {
+        return fs.addDoc(col, { lat: p.lat, lng: p.lng, title: p.title, note: p.note, reporter: p.reporter,
+                                spottedAt: fs.Timestamp.fromMillis(p.spotted_at), createdAt: fs.serverTimestamp() });
+      }
+    };
+  }
+  function demoStore() {
+    const KEY = 'mitch-demo-pins';
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } };
+    let listeners = [];
+    return {
+      shared: false,
+      subscribe(cb) { listeners.push(cb); cb(read()); },
+      async add(p) {
+        const all = read(); all.push({ ...p, id: 'demo-' + Date.now() });
+        try { localStorage.setItem(KEY, JSON.stringify(all)); } catch (e) {}
+        listeners.forEach(cb => cb(all));
+      }
+    };
+  }
+
+  /* ───────── state ───────── */
+  let map, InfoWindow, Marker, Geocoder, info;
+  let mode = 'find', pins = [], markers = new Map(), draft = null, store;
+  const seeds = (cfg.seedSightings || []).map(s => ({ ...s, spotted_at: new Date(s.spotted_at).getTime() }));
+
+  /* ───────── tabs ───────── */
+  function setMode(m) {
+    mode = m;
+    $('tabFind').setAttribute('aria-selected', m === 'find');
+    $('tabSpot').setAttribute('aria-selected', m === 'spot');
+    $('viewFind').classList.toggle('show', m === 'find');
+    $('viewSpot').classList.toggle('show', m === 'spot');
+    if (map) map.setOptions({ draggableCursor: m === 'spot' ? 'crosshair' : null });
+    $('map').classList.toggle('spotting', m === 'spot');
+    if (m === 'find') clearDraft();
+    else if (info) info.close();
+  }
+  $('tabFind').onclick = () => setMode('find');
+  $('tabSpot').onclick = () => setMode('spot');
+
+  /* ───────── markers / list ───────── */
+  function pinEl(latest) {
+    const d = el('div', 'pin' + (latest ? ' latest' : ''));
+    const f = el('div', 'face');
+    f.innerHTML = '<svg viewBox="14 2 72 72" aria-hidden="true"><use href="#mitch-bust" width="100" height="120"/></svg>'; // static markup, no user text
+    d.append(f); return d;
+  }
+  function infoContent(p) {
+    const d = el('div', 'iw');
+    d.append(el('div', 't', p.title || 'Mitch sighting'), el('div', 'w', fmt(p.spotted_at) + ' · ' + ago(p.spotted_at)));
+    if (p.note) d.append(el('div', 'n', p.note));
+    if (p.reporter) d.append(el('div', 'b', 'Spotted by ' + p.reporter));
+    return d;
+  }
+  function openPin(p, fly) {
+    if (!map) return;
+    const m = markers.get(p.id);
+    if (fly) { map.panTo({ lat: p.lat, lng: p.lng }); if (map.getZoom() < 15) map.setZoom(15); }
+    if (m) { info.setContent(infoContent(p)); info.open({ anchor: m, map }); }
+  }
+
+  function render() {
+    const sorted = [...seeds, ...pins].sort((a, b) => b.spotted_at - a.spotted_at);
+    $('stat').textContent = sorted.length + (sorted.length === 1 ? ' sighting' : ' sightings') + ' so far. The hunt is on!';
+    $('lastSeen').textContent = sorted.length ? (sorted[0].title || 'Mystery spot') + ' · ' + ago(sorted[0].spotted_at) : 'Nobody knows…';
+
+    const list = $('list'); list.replaceChildren();
+    markers.forEach(m => { m.map = null; }); markers.clear();
+
+    sorted.forEach((p, i) => {
+      const latest = i === 0;
+      if (map) {
+        const m = new Marker({ map, position: { lat: p.lat, lng: p.lng }, content: pinEl(latest), title: p.title, zIndex: latest ? 1000 : 1 });
+        m.addEventListener('gmp-click', () => { if (mode === 'find') openPin(p, false); });
+        markers.set(p.id, m);
+      }
+      const it = el('div', 'item' + (latest ? ' latest' : '')); it.tabIndex = 0;
+      it.append(el('div', 't', p.title || 'Mystery spot'), el('div', 'w', fmt(p.spotted_at) + ' · ' + ago(p.spotted_at)));
+      if (p.note) it.append(el('div', 'n', p.note));
+      if (p.reporter) it.append(el('div', 'b', 'Spotted by ' + p.reporter));
+      const go = () => openPin(p, true);
+      it.onclick = go; it.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+      list.append(it);
+    });
+  }
+
+  /* ───────── dropping a pin ───────── */
+  function showCoords(p) { const c = ll(p); $('coords').textContent = '📍 ' + c.lat.toFixed(5) + ', ' + c.lng.toFixed(5) + ' (drag the pin to adjust)'; }
+  function setDraft(pos) {
+    if (!map) return;
+    if (draft) draft.position = pos;
+    else {
+      const c = el('div', 'draftpin');
+      c.innerHTML = '<svg viewBox="0 0 34 44" width="34" height="44" aria-hidden="true"><path d="M17 43C17 43 3 27 3 17a14 14 0 0 1 28 0C31 27 17 43 17 43Z" fill="#e4572e" stroke="#14213d" stroke-width="3"/><circle cx="17" cy="17" r="5.5" fill="#fff" stroke="#14213d" stroke-width="2"/></svg>';
+      draft = new Marker({ map, position: pos, content: c, gmpDraggable: true, zIndex: 2000 });
+      draft.addEventListener('dragend', () => showCoords(draft.position));
+    }
+    showCoords(pos);
+    $('form').hidden = false;
+    $('when').max = localNow();
+    if (!$('when').value) $('when').value = localNow();
+    $('title').focus({ preventScroll: false });
+  }
+  function clearDraft() {
+    if (draft) { draft.map = null; draft = null; }
+    $('form').reset(); $('form').hidden = true; $('msg').textContent = ''; $('searchMsg').textContent = '';
+    try { $('reporter').value = localStorage.getItem('mitch-reporter') || ''; } catch (e) {}
+  }
+  $('cancel').onclick = clearDraft;
+
+  async function search() {
+    const q = $('search').value.trim(), out = $('searchMsg');
+    if (!q || !map) return;
+    out.className = 'msg'; out.textContent = 'Searching…';
+    try {
+      const { results } = await new Geocoder().geocode({ address: q });
+      if (!results.length) throw new Error('none');
+      const r = results[0];
+      if (r.geometry.viewport) map.fitBounds(r.geometry.viewport); else { map.setCenter(r.geometry.location); map.setZoom(17); }
+      setDraft(r.geometry.location);
+      out.textContent = 'Found it! Drag the pin onto the exact spot.';
+    } catch (e) { out.className = 'msg err'; out.textContent = 'Couldn’t find that place. Try a fuller address.'; }
+  }
+  $('searchBtn').onclick = search;
+  $('search').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); search(); } };
+  $('locBtn').onclick = () => {
+    if (!navigator.geolocation || !map) return;
+    navigator.geolocation.getCurrentPosition(
+      p => { const pos = { lat: p.coords.latitude, lng: p.coords.longitude }; map.setCenter(pos); map.setZoom(17); setDraft(pos); },
+      () => { $('searchMsg').className = 'msg err'; $('searchMsg').textContent = 'Couldn’t get your location.'; });
+  };
+
+  $('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!draft) return;
+    const msg = $('msg'), btn = $('submit'), pos = ll(draft.position);
+    const when = new Date($('when').value).getTime();
+    msg.className = 'msg';
+    if (!$('title').value.trim()) { msg.className = 'msg err'; msg.textContent = 'Give your sighting a title!'; return; }
+    if (!Number.isFinite(when) || when > Date.now() + 60000) { msg.className = 'msg err'; msg.textContent = 'Mitch can’t be spotted in the future (yet).'; return; }
+    const reporter = $('reporter').value.trim();
+    btn.disabled = true; msg.textContent = 'Pinning…';
+    try {
+      await store.add({ lat: pos.lat, lng: pos.lng, title: $('title').value.trim(), note: $('note').value.trim(), reporter, spotted_at: when });
+      try { localStorage.setItem('mitch-reporter', reporter); } catch (e) {}
+      clearDraft(); setMode('find');
+      map.panTo(pos); if (map.getZoom() < 15) map.setZoom(15);
+      confetti(); toast('Gotcha! Mitch has been pinned 📍');
+    } catch (err) {
+      msg.className = 'msg err';
+      msg.textContent = 'Couldn’t save that pin. Please try again in a moment.';
+    } finally { btn.disabled = false; }
+  });
+
+  /* ───────── boot ───────── */
+  function showMapMessage(title, html) {
+    const box = $('mapMsg'); box.classList.add('show');
+    const d = box.firstElementChild; d.replaceChildren(el('h2', '', title));
+    const p = el('p'); p.innerHTML = html; d.append(p); // static strings only
+  }
+
+  async function boot() {
+    try { $('reporter').value = localStorage.getItem('mitch-reporter') || ''; } catch (e) {}
+
+    try { store = hasFirebase ? await firebaseStore() : demoStore(); }
+    catch (e) { console.error(e); store = demoStore(); }
+    if (!store.shared) {
+      const b = $('demoBanner'); b.hidden = false;
+      b.textContent = hasFirebase ? 'Couldn’t reach the shared database, so pins are only saved in this browser for now.'
+                                  : 'Demo mode: Firebase isn’t set up yet, so pins are only saved in this browser.';
+    }
+
+    if (hasMaps) {
+      window.gm_authFailure = () => showMapMessage('Map key problem', 'Google rejected the Maps API key. Check that <code>Maps JavaScript API</code> is enabled and that this site’s URL is allowed for the key.');
+      try {
+        await new Promise((res, rej) => {
+          window.__mapsReady = res;
+          const s = document.createElement('script');
+          s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(cfg.googleMapsApiKey) + '&v=weekly&loading=async&callback=__mapsReady';
+          s.onerror = rej; document.head.append(s);
+        });
+        const maps = await google.maps.importLibrary('maps');
+        const marker = await google.maps.importLibrary('marker');
+        const geo = await google.maps.importLibrary('geocoding');
+        InfoWindow = maps.InfoWindow; Marker = marker.AdvancedMarkerElement; Geocoder = geo.Geocoder;
+        const start = seeds[0] ? { lat: seeds[0].lat, lng: seeds[0].lng } : { lat: 40.7128, lng: -74.006 };
+        map = new maps.Map($('map'), {
+          center: start, zoom: 14, mapId: cfg.mapId || 'DEMO_MAP_ID',
+          streetViewControl: false, fullscreenControl: false, mapTypeControl: false, clickableIcons: false
+        });
+        info = new InfoWindow({ maxWidth: 270 });
+        map.addListener('click', e => { if (mode === 'spot' && e.latLng) setDraft(e.latLng); else info.close(); });
+      } catch (e) {
+        console.error(e);
+        showMapMessage('The map took a nap', 'Google Maps didn’t load. Check your connection and the API key in <code>config.js</code>.');
+      }
+    } else {
+      showMapMessage('Almost there!', 'Add your Google Maps API key to <code>config.js</code> to wake up the map. The sightings list works in the meantime.');
+    }
+
+    store.subscribe(p => { pins = p; render(); }, err => console.error(err));
+    render();
+    if (map && seeds[0]) setTimeout(() => openPin(seeds.slice().sort((a, b) => b.spotted_at - a.spotted_at)[0], false), 600);
+    setInterval(render, 60000);
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

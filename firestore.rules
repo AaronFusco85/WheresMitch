@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /sightings/{id} {
+      // Everyone can see the map.
+      allow read: if true;
+
+      // Anyone can drop a pin, but only well-formed ones. No edits or deletes
+      // from the website (moderate in the Firebase console).
+      allow create: if
+        request.resource.data.keys().hasOnly(['lat','lng','title','note','reporter','spottedAt','createdAt'])
+        && request.resource.data.lat is number
+        && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+        && request.resource.data.lng is number
+        && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
+        && request.resource.data.note is string && request.resource.data.note.size() <= 500
+        && request.resource.data.reporter is string && request.resource.data.reporter.size() <= 40
+        && request.resource.data.spottedAt is timestamp
+        && request.resource.data.spottedAt <= request.time + duration.value(5, 'm')
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+  }
+}
