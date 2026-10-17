@@ -7,7 +7,7 @@
 window.MITCH_CONFIG = {
   // Google Cloud → APIs & Services → Credentials. Enable "Maps JavaScript API"
   // and "Geocoding API". Restrict to your site's URL (HTTP referrer).
-  googleMapsApiKey: 'YOUR_GOOGLE_MAPS_API_KEY',
+  googleMapsApiKey: 'AIzaSyBe0RDqfGJSU-kqkgagUVjUDESwEHw8KqE',
 
   // Optional: a Map ID from Google Cloud → Map Management (needed for custom
   // cloud styling). 'DEMO_MAP_ID' works for development.
@@ -15,10 +15,10 @@ window.MITCH_CONFIG = {
 
   // Firebase console → Project settings → Your apps → Web app → Config
   firebase: {
-    apiKey: 'YOUR_FIREBASE_API_KEY',
-    authDomain: 'YOUR_PROJECT.firebaseapp.com',
-    projectId: 'YOUR_PROJECT',
-    appId: 'YOUR_APP_ID'
+    apiKey: 'AIzaSyDRFTJdSrorpa6pj-rIfGnVdJRKIlj_hRQ',
+    authDomain: 'wheresmitch.firebaseapp.com',
+    projectId: 'wheresmitch',
+    appId: '1:912680177767:web:a7d84f0eb72704360104c2'
   },
 
   // Sightings that are always on the map (they live here, not in the database).
